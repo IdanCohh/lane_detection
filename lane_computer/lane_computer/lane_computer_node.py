@@ -28,9 +28,10 @@ class LaneComputerNode(Node):
             10
         )
         
+        # I chose this one as the primary solution
         self.distance_publisher_tf = self.create_publisher(
             Float64,
-            '/assignment/travelled_distance_tf',
+            '/assignment/travelled_distance',
             10
         )
         
@@ -144,7 +145,7 @@ class LaneComputerNode(Node):
                 'base_link', 
                 rclpy.time.Time()
             )
-            
+
             current_position = (
                 transform.transform.translation.x,
                 transform.transform.translation.y
@@ -163,7 +164,7 @@ class LaneComputerNode(Node):
             self.last_position = current_position
             
         except Exception as e:
-            self.get_logger().error(f"Failed to get transform: {e}")
+            pass
 
 def main(args=None):
     rclpy.init(args=args)
