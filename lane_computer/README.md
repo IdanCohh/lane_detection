@@ -68,3 +68,5 @@ interpolation method.
 -- Use cmd_vel topic to estimate distance over time.
 -- Use the transform between the vehicle's frame and a fixed frame 
 (like `odom` and `base_link`) to calculate the distance travelled.
+-- Given wheels' radius (not given), we can average over the 4 wheels' rotation velocity to
+estimate the distance travelled. We can see the wheels' transforms spinning.
