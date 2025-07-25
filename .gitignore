@@ -1,0 +1,28 @@
+log
+
+# CMake build artifacts
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Editor files
+*.swp
+*.swo
+*.user
+*.vcxproj
+*.DS_Store
+
+# Binaries
+*.out
+*.exe
+*.a
+*.so
+*.dll
+
+# VS Code workspace files
+.vscode/
+.github/
+
+info
