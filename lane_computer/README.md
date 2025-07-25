@@ -50,6 +50,11 @@ previous point or by adding a constant offset (3.5 meters approx).
 - Easy solution was implemented first.
 - Better solution should be implemented later, which will be a more robust 
 interpolation method.
+- I'm not fully satisfied with my implementation as this is a bare-bone solution. 
+I didn't have time to implement the more robust solution I wanted, due to 
+time constraints as some of my time was 'wasted' on bringing up and 
+installing ros, foxglove, etc. on my personal laptop, though I did that after 
+the initial commit so you can use the git info for reference on the time it took.
 
 ## Task 2 - Distance Estimation Approaches
 
@@ -88,16 +93,15 @@ Velocity integration serves as validation method to detect sensor issues.
 Both outputs enable cross-verification of odometry health.
 
 ### Additional Notes
-
-- Several ideas to implement this:
--- Use `cmd_vel` topic to estimate distance over time (implemented).
--- Use the transform between the vehicle's frame and a fixed frame 
+Several ideas of how to implement this:
+- Use `cmd_vel` topic to estimate distance over time (implemented).
+- Use the transform between the vehicle's frame and a fixed frame 
 (like `odom` and `base_link`) to calculate the distance travelled (implemented).
--- Measure using the IMU info over time (`/vehicle/imu/data_raw`). 
--- Measure using the GPS info over time (`/vehicle/gps/fix`).
--- Measure using the acceleration info over time (`/vehicle/accel`).
--- Measure using the average of all the above methods, but it is costly.
--- Given wheels' radius (not given), we can average over the 4 wheels' rotation 
+- Measure using the IMU info over time (`/vehicle/imu/data_raw`). 
+- Measure using the GPS info over time (`/vehicle/gps/fix`).
+- Measure using the acceleration info over time (`/vehicle/accel`).
+- Measure using the average of all the above methods, but it is costly.
+- Given wheels' radius (not given), we can average over the 4 wheels' rotation 
 velocity to estimate the distance travelled.
 
 From the approaches I implemented I'd summarize:
