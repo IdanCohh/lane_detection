@@ -142,7 +142,22 @@ class LaneComputerNode(Node):
             center_point.z = (left_points[i].z + right_points[i].z) / 2.0
             center_points.append(center_point)
         
-        if center_points:
+        if len(center_points) > 2:
+            x_coords = [p.x for p in center_points]
+            y_coords = [p.y for p in center_points]
+            
+            poly = np.poly1d(np.polyfit(x_coords, y_coords, 2))
+            
+            smoothed_points = []
+            for p in center_points:
+                sp = Point()
+                sp.x = p.x
+                sp.y = poly(p.x)
+                sp.z = p.z
+                smoothed_points.append(sp)
+            
+            self.publish_trajectory(smoothed_points)
+        elif center_points:
             self.publish_trajectory(center_points)
     
     def publish_trajectory(self, center_points):
