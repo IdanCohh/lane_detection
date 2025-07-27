@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 import tf2_ros
+import numpy as np
 
 from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import Point, TwistStamped
@@ -9,7 +10,8 @@ from std_msgs.msg import Float64
 class LaneComputerNode(Node):
     __slots__ = ('lanes_subscriber', 'trajectory_publisher', 'distance_publisher_tf', 
                  'distance_publisher_vel', 'twist_subscriber', 'tf_buffer', 'tf_listener', 
-                 'last_position', 'total_distance_tf', 'total_distance_vel', 'last_time')
+                 'last_position', 'total_distance_tf', 'total_distance_vel', 'last_time',
+                 'last_left_boundary', 'last_right_boundary')
 
     def __init__(self):
         super().__init__('lane_computer_node')
@@ -28,7 +30,6 @@ class LaneComputerNode(Node):
             10
         )
         
-        # I chose this one as the primary solution
         self.distance_publisher_tf = self.create_publisher(
             Float64,
             '/assignment/travelled_distance',
@@ -55,6 +56,8 @@ class LaneComputerNode(Node):
         self.total_distance_tf = 0.0
         self.total_distance_vel = 0.0
         self.last_time = None
+        self.last_left_boundary = None
+        self.last_right_boundary = None
         
         self.create_timer(0.1, self.update_distance_tf)
 
@@ -68,35 +71,59 @@ class LaneComputerNode(Node):
             elif marker.text == "R0":
                 right_boundary = marker.points
         
-        if not left_boundary and not right_boundary:
-            self.get_logger().error('No lane boundaries found in the message.')
+        if left_boundary and right_boundary:
+            self.last_left_boundary = left_boundary
+            self.last_right_boundary = right_boundary
+        elif left_boundary:
+            right_boundary = self.last_right_boundary
+        elif right_boundary:
+            left_boundary = self.last_left_boundary
+        else:
+            left_boundary = self.last_left_boundary
+            right_boundary = self.last_right_boundary
+
+        if not left_boundary or not right_boundary:
             return
-        
-        elif left_boundary and not right_boundary:
-            right_boundary = self.interpolate_missing_boundary(left_boundary, offset=-3.5)
-
-        elif right_boundary and not left_boundary:
-            left_boundary = self.interpolate_missing_boundary(right_boundary, offset=3.5)
-
-        # else == both lanes data are valid
 
         self.process_lane_boundaries(left_boundary, right_boundary)
 
-    def interpolate_missing_boundary(self, reference_points, offset):
-        interpolated_points = []
-        for point in reference_points:
-            new_point = type(point)()
-            new_point.x = point.x
-            new_point.y = point.y + offset
-            new_point.z = point.z
-            interpolated_points.append(new_point)
-        return interpolated_points
-
     def process_lane_boundaries(self, left_points, right_points):
-        min_len = min(len(left_points), len(right_points))
+        if len(left_points) > len(right_points):
+            longer_lane = left_points
+            shorter_lane = right_points
+            is_left_longer = True
+        else:
+            longer_lane = right_points
+            shorter_lane = left_points
+            is_left_longer = False
+
+        if not shorter_lane:
+            self.publish_trajectory(longer_lane)
+            return
+
+        shorter_x = [p.x for p in shorter_lane]
+        shorter_y = [p.y for p in shorter_lane]
+        longer_x = [p.x for p in longer_lane]
+
+        interp_y = np.interp(longer_x, shorter_x, shorter_y)
+
+        interpolated_shorter_lane = []
+        for i, x_val in enumerate(longer_x):
+            p = Point()
+            p.x = x_val
+            p.y = interp_y[i]
+            p.z = longer_lane[i].z
+            interpolated_shorter_lane.append(p)
+
+        if is_left_longer:
+            left_points = longer_lane
+            right_points = interpolated_shorter_lane
+        else:
+            left_points = interpolated_shorter_lane
+            right_points = longer_lane
+
         center_points = []
-        
-        for i in range(min_len):
+        for i in range(len(longer_lane)):
             center_point = Point()
             center_point.x = (left_points[i].x + right_points[i].x) / 2.0
             center_point.y = (left_points[i].y + right_points[i].y) / 2.0
