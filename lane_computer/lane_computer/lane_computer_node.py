@@ -97,20 +97,32 @@ class LaneComputerNode(Node):
             shorter_lane = left_points
             is_left_longer = False
 
-        if not shorter_lane:
+        if not shorter_lane or len(shorter_lane) < 2:
             self.publish_trajectory(longer_lane)
             return
 
-        shorter_x = [p.x for p in shorter_lane]
-        shorter_y = [p.y for p in shorter_lane]
-        longer_x = [p.x for p in longer_lane]
+        def get_arc_lengths(points):
+            points_arr = np.array([[p.x, p.y] for p in points])
+            distances = np.sqrt(np.sum(np.diff(points_arr, axis=0)**2, axis=1))
+            return np.insert(np.cumsum(distances), 0, 0)
 
-        interp_y = np.interp(longer_x, shorter_x, shorter_y)
+        s_longer = get_arc_lengths(longer_lane)
+        s_shorter = get_arc_lengths(shorter_lane)
+
+        if s_shorter[-1] < 1e-6:
+            self.publish_trajectory(longer_lane)
+            return
+
+        shorter_x = np.array([p.x for p in shorter_lane])
+        shorter_y = np.array([p.y for p in shorter_lane])
+
+        interp_x = np.interp(s_longer, s_shorter, shorter_x)
+        interp_y = np.interp(s_longer, s_shorter, shorter_y)
 
         interpolated_shorter_lane = []
-        for i, x_val in enumerate(longer_x):
+        for i in range(len(longer_lane)):
             p = Point()
-            p.x = x_val
+            p.x = interp_x[i]
             p.y = interp_y[i]
             p.z = longer_lane[i].z
             interpolated_shorter_lane.append(p)
