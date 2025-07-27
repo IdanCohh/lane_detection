@@ -11,7 +11,7 @@ class LaneComputerNode(Node):
     __slots__ = ('lanes_subscriber', 'trajectory_publisher', 'distance_publisher_tf', 
                  'distance_publisher_vel', 'twist_subscriber', 'tf_buffer', 'tf_listener', 
                  'last_position', 'total_distance_tf', 'total_distance_vel', 'last_time',
-                 'last_left_boundary', 'last_right_boundary')
+                 'last_left_boundary', 'last_right_boundary', 'min_lane_points')
 
     def __init__(self):
         super().__init__('lane_computer_node')
@@ -58,6 +58,7 @@ class LaneComputerNode(Node):
         self.last_time = None
         self.last_left_boundary = None
         self.last_right_boundary = None
+        self.min_lane_points = 3
         
         self.create_timer(0.1, self.update_distance_tf)
 
@@ -71,13 +72,18 @@ class LaneComputerNode(Node):
             elif marker.text == "R0":
                 right_boundary = marker.points
         
-        if left_boundary and right_boundary:
+        valid_left = left_boundary and len(left_boundary) >= self.min_lane_points
+        valid_right = right_boundary and len(right_boundary) >= self.min_lane_points
+
+        if valid_left and valid_right:
             self.last_left_boundary = left_boundary
             self.last_right_boundary = right_boundary
-        elif left_boundary:
+        elif valid_left:
+            self.last_left_boundary = left_boundary
             right_boundary = self.last_right_boundary
-        elif right_boundary:
+        elif valid_right:
             left_boundary = self.last_left_boundary
+            self.last_right_boundary = right_boundary
         else:
             left_boundary = self.last_left_boundary
             right_boundary = self.last_right_boundary
@@ -97,20 +103,32 @@ class LaneComputerNode(Node):
             shorter_lane = left_points
             is_left_longer = False
 
-        if not shorter_lane:
+        if not shorter_lane or len(shorter_lane) < 2:
             self.publish_trajectory(longer_lane)
             return
 
-        shorter_x = [p.x for p in shorter_lane]
-        shorter_y = [p.y for p in shorter_lane]
-        longer_x = [p.x for p in longer_lane]
+        def get_arc_lengths(points):
+            points_arr = np.array([[p.x, p.y] for p in points])
+            distances = np.sqrt(np.sum(np.diff(points_arr, axis=0)**2, axis=1))
+            return np.insert(np.cumsum(distances), 0, 0)
 
-        interp_y = np.interp(longer_x, shorter_x, shorter_y)
+        s_longer = get_arc_lengths(longer_lane)
+        s_shorter = get_arc_lengths(shorter_lane)
+
+        if s_shorter[-1] < 1e-6:
+            self.publish_trajectory(longer_lane)
+            return
+
+        shorter_x = np.array([p.x for p in shorter_lane])
+        shorter_y = np.array([p.y for p in shorter_lane])
+
+        interp_x = np.interp(s_longer, s_shorter, shorter_x)
+        interp_y = np.interp(s_longer, s_shorter, shorter_y)
 
         interpolated_shorter_lane = []
-        for i, x_val in enumerate(longer_x):
+        for i in range(len(longer_lane)):
             p = Point()
-            p.x = x_val
+            p.x = interp_x[i]
             p.y = interp_y[i]
             p.z = longer_lane[i].z
             interpolated_shorter_lane.append(p)
@@ -130,7 +148,22 @@ class LaneComputerNode(Node):
             center_point.z = (left_points[i].z + right_points[i].z) / 2.0
             center_points.append(center_point)
         
-        if center_points:
+        if len(center_points) > 2:
+            x_coords = [p.x for p in center_points]
+            y_coords = [p.y for p in center_points]
+            
+            poly = np.poly1d(np.polyfit(x_coords, y_coords, 2))
+            
+            smoothed_points = []
+            for p in center_points:
+                sp = Point()
+                sp.x = p.x
+                sp.y = poly(p.x)
+                sp.z = p.z
+                smoothed_points.append(sp)
+            
+            self.publish_trajectory(smoothed_points)
+        elif center_points:
             self.publish_trajectory(center_points)
     
     def publish_trajectory(self, center_points):

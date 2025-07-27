@@ -21,6 +21,10 @@ Makefile
 *.so
 *.dll
 
+# Colcon build artifacts
+install/
+log/
+
 # VS Code workspace files
 .vscode/
 .github/
