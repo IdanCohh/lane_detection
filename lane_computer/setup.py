@@ -10,7 +10,7 @@ with open(os.path.join('resource', package_name), 'w') as f:
 
 setup(
     name=package_name,
-    version='0.0.1',
+    version='0.0.2',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
