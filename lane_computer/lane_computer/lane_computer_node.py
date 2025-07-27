@@ -11,7 +11,7 @@ class LaneComputerNode(Node):
     __slots__ = ('lanes_subscriber', 'trajectory_publisher', 'distance_publisher_tf', 
                  'distance_publisher_vel', 'twist_subscriber', 'tf_buffer', 'tf_listener', 
                  'last_position', 'total_distance_tf', 'total_distance_vel', 'last_time',
-                 'last_left_boundary', 'last_right_boundary')
+                 'last_left_boundary', 'last_right_boundary', 'min_lane_points')
 
     def __init__(self):
         super().__init__('lane_computer_node')
@@ -58,6 +58,7 @@ class LaneComputerNode(Node):
         self.last_time = None
         self.last_left_boundary = None
         self.last_right_boundary = None
+        self.min_lane_points = 3
         
         self.create_timer(0.1, self.update_distance_tf)
 
@@ -71,13 +72,18 @@ class LaneComputerNode(Node):
             elif marker.text == "R0":
                 right_boundary = marker.points
         
-        if left_boundary and right_boundary:
+        valid_left = left_boundary and len(left_boundary) >= self.min_lane_points
+        valid_right = right_boundary and len(right_boundary) >= self.min_lane_points
+
+        if valid_left and valid_right:
             self.last_left_boundary = left_boundary
             self.last_right_boundary = right_boundary
-        elif left_boundary:
+        elif valid_left:
+            self.last_left_boundary = left_boundary
             right_boundary = self.last_right_boundary
-        elif right_boundary:
+        elif valid_right:
             left_boundary = self.last_left_boundary
+            self.last_right_boundary = right_boundary
         else:
             left_boundary = self.last_left_boundary
             right_boundary = self.last_right_boundary
